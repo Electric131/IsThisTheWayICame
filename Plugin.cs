@@ -70,8 +70,8 @@ namespace IsThisTheWayICame
             [HarmonyPriority(Priority.LowerThanNormal)]
             static void SetExitIDsPatch(ref RoundManager __instance)
             {
-                Networker.Instance.FullRelocation();
                 random = new Random(StartOfRound.Instance.randomMapSeed + 172); // Random seed offset for random number generator
+                Networker.Instance.FullRelocation();
             }
 
             [HarmonyPatch("Start")]
@@ -195,10 +195,9 @@ namespace IsThisTheWayICame
                 GameObject[] objects = levelScene.GetRootGameObjects();
                 foreach (GameObject obj in objects)
                 {
-                    if (obj.name == "EntranceTeleportB(Clone)")
+                    if (obj.name.StartsWith("EntranceTeleport") && obj.name != "EntranceTeleportA(Clone)")
                     {
                         Relocate(objects[0].transform, obj.transform);
-                        break;
                     }
                 }
             }

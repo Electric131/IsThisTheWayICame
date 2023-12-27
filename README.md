@@ -16,3 +16,8 @@ Entering a fire exit from the outside has a chance to spawn you at a mimic on th
 
 ## v1.0.0
 - First release
+
+## v1.0.1
+- Removed DLL from github source
+- Fixed bug on maps with more than one fire exit
+- Fixed bug where mod did nothing until first door was used
