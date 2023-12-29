@@ -17,7 +17,7 @@ namespace IsThisTheWayICame
     {
         private const string modGUID = "Electric.IsThisTheWayICame";
         private const string modName = "IsThisTheWayICame";
-        private const string modVersion = "0.1.0";
+        private const string modVersion = "1.0.2";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -65,12 +65,11 @@ namespace IsThisTheWayICame
         [HarmonyPatch(typeof(RoundManager))]
         internal class RoundManagerPatch
         {
-            [HarmonyPatch("SetExitIDs")]
+            // Patch into part of level generation for initial relocation
+            [HarmonyPatch("SpawnSyncedProps")]
             [HarmonyPostfix]
-            [HarmonyPriority(Priority.LowerThanNormal)]
-            static void SetExitIDsPatch(ref RoundManager __instance)
+            static void SpawnSyncedProps(ref RoundManager __instance)
             {
-                random = new Random(StartOfRound.Instance.randomMapSeed + 172); // Random seed offset for random number generator
                 Networker.Instance.FullRelocation();
             }
 
@@ -191,13 +190,19 @@ namespace IsThisTheWayICame
             [ClientRpc]
             public void FullRelocationClientRpc()
             {
+                if (random == null)
+                {
+                    random = new Random(StartOfRound.Instance.randomMapSeed + 172); // Random seed offset for random number generator
+                }
+                Scene teleporterScene = SceneManager.GetSceneByName("SampleSceneRelay");
                 Scene levelScene = SceneManager.GetSceneByName(RoundManager.Instance.currentLevel.sceneName);
-                GameObject[] objects = levelScene.GetRootGameObjects();
+                if (GameNetworkManager.Instance.isHostingGame) { teleporterScene = levelScene; }
+                GameObject[] objects = teleporterScene.GetRootGameObjects();
                 foreach (GameObject obj in objects)
                 {
                     if (obj.name.StartsWith("EntranceTeleport") && obj.name != "EntranceTeleportA(Clone)")
                     {
-                        Relocate(objects[0].transform, obj.transform);
+                        Relocate(levelScene.GetRootGameObjects()[0].transform, obj.transform);
                     }
                 }
             }
