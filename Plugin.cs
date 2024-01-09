@@ -1,6 +1,4 @@
 using BepInEx;
-using DunGen;
-using GameNetcodeStuff;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -17,7 +15,7 @@ namespace IsThisTheWayICame
     {
         private const string modGUID = "Electric.IsThisTheWayICame";
         private const string modName = "IsThisTheWayICame";
-        private const string modVersion = "1.0.2";
+        private const string modVersion = "1.1.0";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -26,8 +24,11 @@ namespace IsThisTheWayICame
         private static int changeOnUseChance;
 
         private static GameObject NetworkerPrefab;
-
-        private static Random random;
+        
+        private static Random? random;
+        private static List<Transform> realExits = new List<Transform>();
+        private static List<Tuple<Vector3, Quaternion>> realExitTPData = new List<Tuple<Vector3, Quaternion>>();
+        private static Tuple<Vector3, Quaternion>? tempLoc;
 
         private void Awake()
         {
@@ -65,18 +66,11 @@ namespace IsThisTheWayICame
         [HarmonyPatch(typeof(RoundManager))]
         internal class RoundManagerPatch
         {
-            // Patch into part of level generation for initial relocation
-            [HarmonyPatch("SpawnSyncedProps")]
-            [HarmonyPostfix]
-            static void SpawnSyncedProps(ref RoundManager __instance)
-            {
-                Networker.Instance.FullRelocation();
-            }
-
             [HarmonyPatch("Start")]
             [HarmonyPostfix]
             static void StartPatch(ref RoundManager __instance)
             {
+                random = null; // Ensure random is purged
                 if (__instance.IsServer && Networker.Instance == null)
                 {
                     GameObject networker = Instantiate<GameObject>(NetworkerPrefab);
@@ -93,16 +87,20 @@ namespace IsThisTheWayICame
         internal class EntranceTeleportPatch
         {
             [HarmonyPatch("TeleportPlayer")]
-            [HarmonyPostfix]
+            [HarmonyPrefix] // Make this prefix so that location changes before teleport
             static void TeleportPlayerPatch(ref EntranceTeleport __instance)
             {
-                if (__instance.entranceId == 1 && __instance.isEntranceToBuilding)
+                if (__instance.entranceId >= 1 && __instance.isEntranceToBuilding)
                 {
+                    if (random == null)
+                    {
+                        Networker.Instance.FullRelocation();
+                        return;
+                    }
                     if (Networker.changeOnUse.Value)
                     {
-                        if (random == null) return;
                         var rng = random.NextDouble();
-                        if (rng < ((float)Networker.changeOnUseChance.Value / 100f))
+                        if (rng < (Networker.changeOnUseChance.Value / 100f))
                         {
                             Networker.Instance.FullRelocation();
                         }
@@ -125,26 +123,50 @@ namespace IsThisTheWayICame
         private static void Relocate(Transform root, Transform obj)
         {
             Transform newTransform = PickDoor(root, obj, StartOfRound.Instance.randomMapSeed);
-            if (!(newTransform.gameObject.name == "MimicDoor(Clone)")) { return; }
             Transform childTransform = obj.GetChild(0);
+            GameObject go = new GameObject("TemporaryAudioSource");
+            TemporaryAudioSource audio = go.AddComponent<TemporaryAudioSource>();
+            if (!(newTransform.gameObject.name == "MimicDoor(Clone)")) {
+                if (tempLoc == null)
+                {
+                    Debug.LogError("Could not find real exit. Report to developer!");
+                } else
+                {
+                    childTransform.rotation = tempLoc.Item2;
+                    childTransform.position = tempLoc.Item1;
+                    go.transform.position = childTransform.position;
+                    obj.GetComponent<EntranceTeleport>().entrancePointAudio = audio.audioSource;
+                }
+                return;
+            }
             // Local position based on defaults: 2.9 -0.435 0.002 with forward of -0.9999 0 -0.0167
             Vector3 localPosition = new Vector3(0f, 0.065f, 0.002f);
             localPosition += newTransform.forward * -1.5f;
             childTransform.position = newTransform.position + localPosition;
             childTransform.rotation = newTransform.rotation;
+            go.transform.position = childTransform.position;
+            obj.GetComponent<EntranceTeleport>().entrancePointAudio = audio.audioSource;
         }
 
         private static Transform PickDoor(Transform root, Transform original, int seed)
         {
             if (random == null) return original;
             var rng = random.NextDouble();
-            if (rng < ((float)fakeChance / 100f)) // Pick random double and check if % chance allows for a fake door tp
+            if (rng < (fakeChance / 100f)) // Pick random double and check if % chance allows for a fake door tp
             {
                 List<Transform> mimics = FindMimics(root, new List<Transform>());
-                if (mimics.Count == 0) return original; // No mimics to swap to
+                if (mimics.Count == 0)
+                { // No mimics to swap to, so: Pick a random real door
+                    rng = random.NextDouble();
+                    tempLoc = realExitTPData.ToArray()[(int)Mathf.Floor((float)rng * realExitTPData.Count)];
+                    return original;
+                }
                 rng = random.NextDouble();
                 return mimics.ToArray()[(int)Mathf.Floor((float)rng * mimics.Count)];
             }
+            // Pick a random real door
+            rng = random.NextDouble();
+            tempLoc = realExitTPData.ToArray()[(int)Mathf.Floor((float)rng * realExitTPData.Count)];
             return original;
         }
 
@@ -190,20 +212,32 @@ namespace IsThisTheWayICame
             [ClientRpc]
             public void FullRelocationClientRpc()
             {
+                bool first = false;
                 if (random == null)
                 {
+                    first = true;
                     random = new Random(StartOfRound.Instance.randomMapSeed + 172); // Random seed offset for random number generator
                 }
                 Scene teleporterScene = SceneManager.GetSceneByName("SampleSceneRelay");
                 Scene levelScene = SceneManager.GetSceneByName(RoundManager.Instance.currentLevel.sceneName);
                 if (GameNetworkManager.Instance.isHostingGame) { teleporterScene = levelScene; }
                 GameObject[] objects = teleporterScene.GetRootGameObjects();
+                List<GameObject> exits = new List<GameObject>();
                 foreach (GameObject obj in objects)
                 {
                     if (obj.name.StartsWith("EntranceTeleport") && obj.name != "EntranceTeleportA(Clone)")
                     {
-                        Relocate(levelScene.GetRootGameObjects()[0].transform, obj.transform);
+                        if (first)
+                        {
+                            realExits.Add(obj.transform);
+                            realExitTPData.Add(new Tuple<Vector3, Quaternion>(obj.transform.GetChild(0).position, obj.transform.GetChild(0).rotation));
+                        }
+                        exits.Add(obj);
                     }
+                }
+                foreach (GameObject obj in exits)
+                {
+                    Relocate(levelScene.GetRootGameObjects()[0].transform, obj.transform);
                 }
             }
 
@@ -211,6 +245,26 @@ namespace IsThisTheWayICame
             public void FullRelocationServerRpc()
             {
                 FullRelocationClientRpc();
+            }
+        }
+
+        private class TemporaryAudioSource : MonoBehaviour
+        {
+            public AudioSource audioSource;
+            public float deletionTime = 0f;
+
+            public TemporaryAudioSource()
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+            }
+
+            public void Update()
+            {
+                deletionTime += Time.deltaTime;
+                if (deletionTime > 5f) // Destroy after 5s
+                {
+                    Destroy(transform.gameObject); // Destroy parent gameobject
+                }
             }
         }
     }

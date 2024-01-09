@@ -24,3 +24,9 @@ Entering a fire exit from the outside has a chance to spawn you at a mimic on th
 
 ## v1.0.2
 - Fixed mod only working on host.. Hopefully <3
+
+## v1.1.0
+- All doors now make the entrance sound.
+- Real exits can now link to other real exits (ex. March).
+- Fixed hidden bug where destination would never switch off a mimic once chosen.
+- Destination now changes properly if change on use is off.
