@@ -34,3 +34,6 @@ Entering a fire exit from the outside has a chance to spawn you at a mimic on th
 ## v1.1.1
 - Sound from doors works properly now.
 - No longer fall into the abyss when teleporting.
+
+## v1.1.2
+- Very minor change to get rid of excess debugging

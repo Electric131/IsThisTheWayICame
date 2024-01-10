@@ -15,7 +15,7 @@ namespace IsThisTheWayICame
     {
         private const string modGUID = "Electric.IsThisTheWayICame";
         private const string modName = "IsThisTheWayICame";
-        private const string modVersion = "1.1.1";
+        private const string modVersion = "1.1.2";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -136,10 +136,7 @@ namespace IsThisTheWayICame
                 {
                     childTransform.rotation = tempLoc.Item2;
                     childTransform.position = tempLoc.Item1;
-                    Debug.Log(childTransform.name);
-                    Debug.Log(childTransform.position);
                     go.transform.position = childTransform.position;
-                    Debug.Log(audio.audioSource);
                     Traverse.Create(obj.GetComponent<EntranceTeleport>()).Field("exitPointAudio").SetValue(audio.audioSource);
                     //obj.GetComponent<EntranceTeleport>().entrancePointAudio = audio.audioSource;
                 }
@@ -164,8 +161,6 @@ namespace IsThisTheWayICame
                 if (mimics.Count == 0)
                 { // No mimics to swap to, so: Pick a random real door
                     rng = random.NextDouble();
-                    Debug.Log(rng);
-                    Debug.Log((int)Mathf.Floor((float)rng * realExitTPData.Count));
                     tempLoc = realExitTPData.ToArray()[(int)Mathf.Floor((float)rng * realExitTPData.Count)];
                     return original;
                 }
@@ -174,8 +169,6 @@ namespace IsThisTheWayICame
             }
             // Pick a random real door
             rng = random.NextDouble();
-            Debug.Log(rng);
-            Debug.Log((int)Mathf.Floor((float)rng * realExitTPData.Count));
             tempLoc = realExitTPData.ToArray()[(int)Mathf.Floor((float)rng * realExitTPData.Count)];
             return original;
         }
