@@ -15,7 +15,7 @@ namespace IsThisTheWayICame
     {
         private const string modGUID = "Electric.IsThisTheWayICame";
         private const string modName = "IsThisTheWayICame";
-        private const string modVersion = "1.1.0";
+        private const string modVersion = "1.1.1";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -29,6 +29,7 @@ namespace IsThisTheWayICame
         private static List<Transform> realExits = new List<Transform>();
         private static List<Tuple<Vector3, Quaternion>> realExitTPData = new List<Tuple<Vector3, Quaternion>>();
         private static Tuple<Vector3, Quaternion>? tempLoc;
+        private static List<GameObject> tempAudioSources = new List<GameObject>();
 
         private void Awake()
         {
@@ -125,6 +126,7 @@ namespace IsThisTheWayICame
             Transform newTransform = PickDoor(root, obj, StartOfRound.Instance.randomMapSeed);
             Transform childTransform = obj.GetChild(0);
             GameObject go = new GameObject("TemporaryAudioSource");
+            tempAudioSources.Add(go);
             TemporaryAudioSource audio = go.AddComponent<TemporaryAudioSource>();
             if (!(newTransform.gameObject.name == "MimicDoor(Clone)")) {
                 if (tempLoc == null)
@@ -134,8 +136,12 @@ namespace IsThisTheWayICame
                 {
                     childTransform.rotation = tempLoc.Item2;
                     childTransform.position = tempLoc.Item1;
+                    Debug.Log(childTransform.name);
+                    Debug.Log(childTransform.position);
                     go.transform.position = childTransform.position;
-                    obj.GetComponent<EntranceTeleport>().entrancePointAudio = audio.audioSource;
+                    Debug.Log(audio.audioSource);
+                    Traverse.Create(obj.GetComponent<EntranceTeleport>()).Field("exitPointAudio").SetValue(audio.audioSource);
+                    //obj.GetComponent<EntranceTeleport>().entrancePointAudio = audio.audioSource;
                 }
                 return;
             }
@@ -158,6 +164,8 @@ namespace IsThisTheWayICame
                 if (mimics.Count == 0)
                 { // No mimics to swap to, so: Pick a random real door
                     rng = random.NextDouble();
+                    Debug.Log(rng);
+                    Debug.Log((int)Mathf.Floor((float)rng * realExitTPData.Count));
                     tempLoc = realExitTPData.ToArray()[(int)Mathf.Floor((float)rng * realExitTPData.Count)];
                     return original;
                 }
@@ -166,6 +174,8 @@ namespace IsThisTheWayICame
             }
             // Pick a random real door
             rng = random.NextDouble();
+            Debug.Log(rng);
+            Debug.Log((int)Mathf.Floor((float)rng * realExitTPData.Count));
             tempLoc = realExitTPData.ToArray()[(int)Mathf.Floor((float)rng * realExitTPData.Count)];
             return original;
         }
@@ -217,12 +227,19 @@ namespace IsThisTheWayICame
                 {
                     first = true;
                     random = new Random(StartOfRound.Instance.randomMapSeed + 172); // Random seed offset for random number generator
+                    realExits.Clear();
+                    realExitTPData.Clear();
                 }
                 Scene teleporterScene = SceneManager.GetSceneByName("SampleSceneRelay");
                 Scene levelScene = SceneManager.GetSceneByName(RoundManager.Instance.currentLevel.sceneName);
                 if (GameNetworkManager.Instance.isHostingGame) { teleporterScene = levelScene; }
                 GameObject[] objects = teleporterScene.GetRootGameObjects();
                 List<GameObject> exits = new List<GameObject>();
+                foreach (GameObject tempAudioSource in tempAudioSources)
+                {
+                    Destroy(tempAudioSource);
+                }
+                tempAudioSources.Clear();
                 foreach (GameObject obj in objects)
                 {
                     if (obj.name.StartsWith("EntranceTeleport") && obj.name != "EntranceTeleportA(Clone)")
@@ -256,15 +273,6 @@ namespace IsThisTheWayICame
             public TemporaryAudioSource()
             {
                 audioSource = gameObject.AddComponent<AudioSource>();
-            }
-
-            public void Update()
-            {
-                deletionTime += Time.deltaTime;
-                if (deletionTime > 5f) // Destroy after 5s
-                {
-                    Destroy(transform.gameObject); // Destroy parent gameobject
-                }
             }
         }
     }
