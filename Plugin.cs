@@ -15,7 +15,7 @@ namespace IsThisTheWayICame
     {
         private const string modGUID = "Electric.IsThisTheWayICame";
         private const string modName = "IsThisTheWayICame";
-        private const string modVersion = "1.1.2";
+        private const string modVersion = "1.1.4";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -24,7 +24,7 @@ namespace IsThisTheWayICame
         private static int changeOnUseChance;
 
         private static GameObject NetworkerPrefab;
-        
+
         private static Random? random;
         private static List<Transform> realExits = new List<Transform>();
         private static List<Tuple<Vector3, Quaternion>> realExitTPData = new List<Tuple<Vector3, Quaternion>>();
@@ -81,16 +81,11 @@ namespace IsThisTheWayICame
                     Networker.changeOnUseChance.Value = changeOnUseChance;
                 }
             }
-        }
 
-        [HarmonyPatch(typeof(StartOfRound))]
-        internal class StartOfRoundPatch
-        {
-            [HarmonyPatch("OpenShipDoors")]
-            [HarmonyPrefix] // Reset random while game is started
-            static void OpenShipDoorsPatch()
+            [HarmonyPatch("SetExitIDs")]
+            [HarmonyPostfix]
+            static void SetExitIDsPatch()
             {
-                Debug.Log("Game started, resetting ITTWIC random number");
                 random = null;
             }
         }
@@ -139,11 +134,13 @@ namespace IsThisTheWayICame
             GameObject go = new GameObject("TemporaryAudioSource");
             tempAudioSources.Add(go);
             TemporaryAudioSource audio = go.AddComponent<TemporaryAudioSource>();
-            if (!(newTransform.gameObject.name == "MimicDoor(Clone)")) {
+            if (!(newTransform.gameObject.name == "MimicDoor(Clone)"))
+            {
                 if (tempLoc == null)
                 {
                     Debug.LogError("Could not find real exit. Report to developer!");
-                } else
+                }
+                else
                 {
                     childTransform.rotation = tempLoc.Item2;
                     childTransform.position = tempLoc.Item1;
@@ -254,6 +251,10 @@ namespace IsThisTheWayICame
                         }
                         exits.Add(obj);
                     }
+                }
+                if (realExits.Count > exits.Count || realExitTPData.Count > exits.Count)
+                {
+                    Debug.LogError("ITTWIC (IsThisTheWayICame) - Exits have exceeded data limit! This normally means something has gone wrong between host and client!");
                 }
                 foreach (GameObject obj in exits)
                 {

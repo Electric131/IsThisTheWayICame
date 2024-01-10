@@ -41,3 +41,6 @@ Entering a fire exit from the outside has a chance to spawn you at a mimic on th
 ## v1.1.3
 - IMPORTANT HOTFIX
 - This fixes a critical bug where TP locations are not reset (due to me not knowing where a proper round start is)
+
+## v1.1.4
+- Teleports actually work on client side.. I really need to test this on clients fr. (Sorry for all these small hotfixes)
