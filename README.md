@@ -37,3 +37,7 @@ Entering a fire exit from the outside has a chance to spawn you at a mimic on th
 
 ## v1.1.2
 - Very minor change to get rid of excess debugging
+
+## v1.1.3
+- IMPORTANT HOTFIX
+- This fixes a critical bug where TP locations are not reset (due to me not knowing where a proper round start is)

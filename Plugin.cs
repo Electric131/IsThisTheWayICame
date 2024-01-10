@@ -71,7 +71,6 @@ namespace IsThisTheWayICame
             [HarmonyPostfix]
             static void StartPatch(ref RoundManager __instance)
             {
-                random = null; // Ensure random is purged
                 if (__instance.IsServer && Networker.Instance == null)
                 {
                     GameObject networker = Instantiate<GameObject>(NetworkerPrefab);
@@ -81,6 +80,18 @@ namespace IsThisTheWayICame
                     Networker.changeOnUse.Value = changeOnUse;
                     Networker.changeOnUseChance.Value = changeOnUseChance;
                 }
+            }
+        }
+
+        [HarmonyPatch(typeof(StartOfRound))]
+        internal class StartOfRoundPatch
+        {
+            [HarmonyPatch("OpenShipDoors")]
+            [HarmonyPrefix] // Reset random while game is started
+            static void OpenShipDoorsPatch()
+            {
+                Debug.Log("Game started, resetting ITTWIC random number");
+                random = null;
             }
         }
 
@@ -138,7 +149,6 @@ namespace IsThisTheWayICame
                     childTransform.position = tempLoc.Item1;
                     go.transform.position = childTransform.position;
                     Traverse.Create(obj.GetComponent<EntranceTeleport>()).Field("exitPointAudio").SetValue(audio.audioSource);
-                    //obj.GetComponent<EntranceTeleport>().entrancePointAudio = audio.audioSource;
                 }
                 return;
             }
